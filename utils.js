@@ -1,57 +1,26 @@
-const fs = require("fs/promises");
-const { authenticate } = require("@google-cloud/local-auth");
-
-async function saveCredentials(client) {
-  const content = await fs.readFile(CREDENTIALS_PATH);
-  const keys = JSON.parse(content);
-  const key = keys.installed || keys.web;
-  const payload = JSON.stringify({
-    type: "authorized_user",
-    client_id: key.client_id,
-    client_secret: key.client_secret,
-    refresh_token: client.credentials.refresh_token,
-  });
-  await fs.writeFile(TOKEN_PATH, payload);
-}
-
 // returns random number from 45 to 125
-
 function getToAddressandSubject(headers) {
-  let to;
+  let fromAddress;
   let subject;
   for (let x of headers) {
     if (x.name === "From") {
-      to = x.value.split("<")[1].split(">")[0];
+      fromAddress = x.value.split("<")[1].split(">")[0];
     }
     if (x.name === "Subject") {
       subject = x.value;
     }
   }
-  return { to, subject };
-}
-
-async function authorize(TOKEN_PATH, CREDENTIALS_PATH, SCOPES) {
-  let client = await loadSavedCredentialsIfExist(TOKEN_PATH);
-  if (client) {
-    return client;
-  }
-  client = await authenticate({
-    scopes: SCOPES,
-    keyfilePath: CREDENTIALS_PATH,
-  });
-  if (client.credentials) {
-    await saveCredentials(client);
-  }
-  return client;
+  return { fromAddress, subject };
 }
 
 function randomNumberGenerator() {
   return (Math.floor(Math.random() * 80) + 45) * 1000;
 }
 
-function encodedEmail(to, subject, threadID) {
+//returns raw encoded email
+function encodedEmail(fromAddress, subject, threadID) {
   const emailContent =
-    `To: ${to}\r\n` +
+    `To: ${fromAddress}\r\n` +
     `Subject: Re: ${subject}\r\n` +
     `In-Reply-To: ${threadID}\r\n` +
     `References: ${threadID}\r\n` +

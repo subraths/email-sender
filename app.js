@@ -77,21 +77,19 @@ async function authorize() {
  */
 
 async function sendEmail(auth) {
-  console.log("working");
-
   const gmail = google.gmail({ version: "v1", auth });
 
-  const labelsForQuery = ["custom_reviewed", "SENT"];
+  const label = {
+    id: "Label_2",
+    name: "custom_reviewed",
+  };
 
-  // returns a query sting that from labelsForQuery, we'll use it below for querying
-  const query = labelsForQuery.map((label) => `-label:${label}`).join(" ");
+  const query = `-label:${label.name} -label:SENT`;
 
   const threads = await gmail.users.threads.list({
     userId: "me",
     q: query,
   });
-
-  console.log(threads.data);
 
   if (!threads.data.threads) {
     return;
@@ -103,33 +101,18 @@ async function sendEmail(auth) {
       id: thread.id,
     });
 
-    const { messages } = singleThread.data;
+    const threadID = singleThread.data.id;
+    const { headers } = singleThread.data.messages[0].payload;
+    const { fromAddress, subject } = getToAddressandSubject(headers);
 
-    const { id: messageId } = singleThread.data.messages[0];
-
-    if (messages.length > 1) {
-      // if there are more
-      await gmail.users.messages.modify({
-        userId: "me",
-        id: messageId,
-        requestBody: {
-          addLabelIds: ["Label_2"],
-        },
-      });
-    } else {
-      const threadID = singleThread.data.id;
-      const { headers } = singleThread.data.messages[0].payload;
-      const { to, subject } = getToAddressandSubject(headers);
-
-      await gmail.users.messages.send({
-        userId: "me",
-        requestBody: {
-          raw: encodedEmail(to, subject, threadID),
-          threadId: threadID,
-          labelIds: ["Label_2"],
-        },
-      });
-    }
+    await gmail.users.messages.send({
+      userId: "me",
+      requestBody: {
+        raw: encodedEmail(fromAddress, subject, threadID),
+        threadId: threadID,
+        labelIds: ["Label_2"],
+      },
+    });
   }
 }
 
