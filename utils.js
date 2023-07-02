@@ -1,5 +1,5 @@
 // returns random number from 45 to 125
-function getToAddressandSubject(headers) {
+function getFromAddressandSubject(headers) {
   let fromAddress;
   let subject;
   for (let x of headers) {
@@ -13,7 +13,7 @@ function getToAddressandSubject(headers) {
   return { fromAddress, subject };
 }
 
-function randomNumberGenerator() {
+function randomIntervalGenerator() {
   return (Math.floor(Math.random() * 80) + 45) * 1000;
 }
 
@@ -46,7 +46,7 @@ async function createLabel() {
 }
 
 module.exports = {
-  randomNumberGenerator,
-  getToAddressandSubject,
+  randomIntervalGenerator,
+  getFromAddressandSubject,
   encodedEmail,
 };

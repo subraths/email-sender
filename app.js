@@ -4,8 +4,8 @@ const process = require("process");
 const { authenticate } = require("@google-cloud/local-auth");
 const { google } = require("googleapis");
 const {
-  getToAddressandSubject,
-  randomNumberGenerator,
+  getFromAddressandSubject,
+  randomIntervalGenerator,
   encodedEmail,
 } = require("./utils");
 
@@ -103,7 +103,7 @@ async function sendEmail(auth) {
 
     const threadID = singleThread.data.id;
     const { headers } = singleThread.data.messages[0].payload;
-    const { fromAddress, subject } = getToAddressandSubject(headers);
+    const { fromAddress, subject } = getFromAddressandSubject(headers);
 
     await gmail.users.messages.send({
       userId: "me",
@@ -123,4 +123,4 @@ setInterval(async () => {
   } catch (err) {
     console.log(err);
   }
-}, randomNumberGenerator());
+}, randomIntervalGenerator());
