@@ -3,6 +3,11 @@ const path = require("path");
 const process = require("process");
 const { authenticate } = require("@google-cloud/local-auth");
 const { google } = require("googleapis");
+const {
+  getToAddressandSubject,
+  randomNumberGenerator,
+  encodedEmail,
+} = require("./utils");
 
 // If modifying these scopes, delete token.json.
 const SCOPES = ["https://mail.google.com/"];
@@ -17,6 +22,7 @@ const CREDENTIALS_PATH = path.join(process.cwd(), "credentials.json");
  *
  * @return {Promise<OAuth2Client|null>}
  */
+
 async function loadSavedCredentialsIfExist() {
   try {
     const content = await fs.readFile(TOKEN_PATH);
@@ -50,7 +56,7 @@ async function saveCredentials(client) {
  * Load or request or authorization to call APIs.
  */
 async function authorize() {
-  let client = await loadSavedCredentialsIfExist();
+  let client = await loadSavedCredentialsIfExist(TOKEN_PATH);
   if (client) {
     return client;
   }
@@ -71,33 +77,21 @@ async function authorize() {
  */
 
 async function sendEmail(auth) {
+  console.log("working");
+
   const gmail = google.gmail({ version: "v1", auth });
-
-  const customLabelExists = await gmail.users.labels.get({
-    userId: "me",
-    id: "Label_2",
-  });
-
-  if (customLabelExists.status === 404) {
-    await gmail.users.labels.create({
-      userId: "me",
-      requestBody: {
-        name: "custom_reviewed",
-        type: "user",
-        messageListVisibility: "show",
-        labelListVisibility: "labelShow",
-      },
-    });
-  }
 
   const labelsForQuery = ["custom_reviewed", "SENT"];
 
+  // returns a query sting that from labelsForQuery, we'll use it below for querying
   const query = labelsForQuery.map((label) => `-label:${label}`).join(" ");
 
   const threads = await gmail.users.threads.list({
     userId: "me",
     q: query,
   });
+
+  console.log(threads.data);
 
   if (!threads.data.threads) {
     return;
@@ -111,60 +105,32 @@ async function sendEmail(auth) {
 
     const { messages } = singleThread.data;
 
+    const { id: messageId } = singleThread.data.messages[0];
+
     if (messages.length > 1) {
+      // if there are more
       await gmail.users.messages.modify({
         userId: "me",
-        id: singleThread.data.id,
+        id: messageId,
         requestBody: {
           addLabelIds: ["Label_2"],
         },
       });
     } else {
       const threadID = singleThread.data.id;
-      const { to, subject } = getToAddressandSubject(
-        singleThread.data.messages[0].payload.headers
-      );
-      const emailContent =
-        `To: ${to}\r\n` +
-        `Subject: Re: ${subject}\r\n` +
-        `In-Reply-To: ${threadID}\r\n` +
-        `References: ${threadID}\r\n` +
-        "Content-Type: text/plain; charset=utf-8\r\n\r\n" +
-        "This is a reply to the thread";
-      const encodedEmail = Buffer.from(emailContent)
-        .toString("base64")
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_");
+      const { headers } = singleThread.data.messages[0].payload;
+      const { to, subject } = getToAddressandSubject(headers);
 
       await gmail.users.messages.send({
         userId: "me",
         requestBody: {
-          raw: encodedEmail,
+          raw: encodedEmail(to, subject, threadID),
           threadId: threadID,
           labelIds: ["Label_2"],
         },
       });
     }
   }
-
-  function getToAddressandSubject(headers) {
-    let to;
-    let subject;
-    for (let header of headers) {
-      if (header.name === "From") {
-        to = header.value.split("<")[1].split(">")[0];
-      }
-      if (header.name === "Subject") {
-        subject = header.value;
-      }
-    }
-    return { to, subject };
-  }
-}
-
-// returns random number from 45 to 125
-function randomNumberGenerator() {
-  return Math.floor(Math.random() * 80) + 45;
 }
 
 setInterval(async () => {
@@ -174,4 +140,4 @@ setInterval(async () => {
   } catch (err) {
     console.log(err);
   }
-}, randomNumberGenerator() * 1000);
+}, randomNumberGenerator());
